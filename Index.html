@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gesture Field :: System v3</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0a;
+            overflow-x: hidden;
+            overflow-y: auto;
+            font-family: 'Courier New', 'Courier', monospace;
+            color: #cccccc;
+        }
+
+        .canvas-container {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+        }
+
+        #three-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .info-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(10, 10, 10, 0.9);
+            border-bottom: 2px solid #ff3300;
+            padding: 20px 30px;
+            display: grid;
+            grid-template-columns: 140px 1fr 1fr;
+            gap: 30px;
+            align-items: start;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .system-title {
+            font-size: 11px;
+            color: #ff3300;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: normal;
+        }
+
+        .section-label {
+            font-size: 10px;
+            color: #ff3300;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+            font-weight: normal;
+        }
+
+        .rules-list, .control-text {
+            font-size: 12px;
+            line-height: 1.7;
+            color: #999999;
+        }
+
+        .video-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 320px;
+            height: 240px;
+            border: 2px solid #ff3300;
+            background: #000;
+            overflow: hidden;
+            z-index: 200;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+        }
+
+        #output_canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+        }
+
+        .video-label {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            font-size: 9px;
+            color: #ff3300;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: rgba(10, 10, 10, 0.8);
+            padding: 3px 6px;
+            z-index: 1;
+        }
+
+        .permission-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: #0a0a0a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .permission-overlay.hidden {
+            display: none;
+        }
+
+        .permission-text {
+            font-size: 14px;
+            color: #999999;
+            text-align: center;
+            max-width: 400px;
+            line-height: 1.7;
+        }
+
+        .permission-btn, .secret-btn {
+            background: transparent;
+            border: 2px solid #ff3300;
+            color: #ff3300;
+            padding: 12px 24px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .permission-btn:hover, .secret-btn:hover {
+            background: #ff3300;
+            color: #0a0a0a;
+        }
+
+        .secret-btn {
+            position: fixed;
+            top: 5px;
+            right: 5px;
+            font-family: 'Proggy', 'Perfect DOS VGA 437', 'Fixedsys', monospace;
+            font-size: 8px;
+            color: #333333;
+            padding: 2px 4px;
+            border: 1px solid #222222;
+            pointer-events: all;
+            z-index: 10001;
+        }
+
+        .secret-btn:hover {
+            color: #ff3300;
+            border-color: #ff3300;
+        }
+
+        .reflection-panel {
+            position: relative;
+            background: #0a0a0a;
+            border-top: 2px solid #ff3300;
+            padding: 40px 30px;
+        }
+
+        .reflection-label {
+            font-size: 10px;
+            color: #ff3300;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+            font-weight: normal;
+        }
+
+        .reflection-text {
+            font-size: 12px;
+            line-height: 1.7;
+            color: #999999;
+            max-width: 900px;
+        }
+
+        @media (max-width: 768px) {
+            .info-panel {
+                grid-template-columns: 1fr;
+                gap: 15px;
+                padding: 15px 20px;
+            }
+            .video-container {
+                width: 240px;
+                height: 180px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="secret-btn">SECRET BUTTON</button>
+
+    <div class="permission-overlay" id="permissionOverlay">
+        <div class="permission-text">
+            This system uses your camera and hand tracking to control particles in 3D space. 
+            Hand gestures: Open palm = push particles | Closed fist = snap to grid and drag | Thumbs up/down = size control.
+        </div>
+        <button class="permission-btn" id="enableCameraBtn">Enable Camera</button>
+    </div>
+
+    <div class="canvas-container">
+        <div class="info-panel">
+            <div class="system-title">Gesture Field v3</div>
+            <div>
+                <div class="section-label">Rules</div>
+                <div class="rules-list">
+                    01 — 3D spheres respond to hand position<br>
+                    02 — Closed fist snaps and drags all spheres<br>
+                    03 — Thumbs up/down changes sphere size<br>
+                    04 — Open palm creates orbital field
+                </div>
+            </div>
+            <div>
+                <div class="section-label">Controls</div>
+                <div class="control-text">
+                    Move your hand in front of camera.
+                </div>
+            </div>
+        </div>
+        <div id="three-canvas"></div>
+    </div>
+
+    <div class="video-container">
+        <div class="video-label">Hand Tracking</div>
+        <video id="video" autoplay playsinline></video>
+        <canvas id="output_canvas"></canvas>
+    </div>
+
+    <div class="reflection-panel">
+        <div class="reflection-label">v3 Reflection</div>
+        <div class="reflection-text">
+            Hand gestures replace cursor control entirely. Closed fist snaps grid and enables rigid drag. Thumbs control scale. 
+            Open palm creates orbital field. Biological input variance creates organic feel while maintaining mechanical clarity. 
+            3D spheres with shadows establish depth. Hand tracking latency acceptable—system remains responsive.
+        </div>
+        <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid #222222;">
+            <div class="reflection-label">Gesture Vocabulary</div>
+            <div class="reflection-text">
+                Three distinct gestures: fist for rigid control, thumbs for scale modulation, open palm for field influence. 
+                Each gesture has clear mechanical consequence. No ambiguity. Rainbow mode accessible via secret button maintains 
+                discovery element.
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+    <script>
+        let rainbowMode = false;
+        let rainbowStartTime = 0;
+
+        document.querySelector('.secret-btn').addEventListener('click', () => {
+            rainbowMode = true;
+            rainbowStartTime = Date.now();
+        });
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0a);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 15;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.getElementById('three-canvas').appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 5);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.camera.left = directionalLight.shadow.camera.bottom = -20;
+        directionalLight.shadow.camera.right = directionalLight.shadow.camera.top = 20;
+        scene.add(directionalLight);
+
+        const plane = new THREE.Mesh(
+            new THREE.PlaneGeometry(50, 50),
+            new THREE.ShadowMaterial({ opacity: 0.3 })
+        );
+        plane.rotation.x = -Math.PI / 2;
+        plane.position.y = -5;
+        plane.receiveShadow = true;
+        scene.add(plane);
+
+        class Sphere {
+            constructor(x, y, z) {
+                this.baseX = x;
+                this.baseY = y;
+                this.baseZ = z;
+                
+                const geometry = new THREE.SphereGeometry(0.3, 16, 16);
+                const material = new THREE.MeshStandardMaterial({ color: 0xff3300, metalness: 0.3, roughness: 0.4 });
+                
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.mesh.position.set(x, y, z);
+                this.mesh.castShadow = this.mesh.receiveShadow = true;
+                scene.add(this.mesh);
+                
+                this.vx = this.vy = this.vz = 0;
+                this.targetScale = this.currentScale = 1;
+            }
+
+            snapToBase() {
+                this.mesh.position.set(this.baseX, this.baseY, this.baseZ);
+                this.vx = this.vy = this.vz = 0;
+            }
+
+            update(handX, handY, handZ, handVelocity, fingerSpread, isFist, thumbDir) {
+                // Scale changes
+                if (thumbDir === 'up') this.targetScale = Math.min(this.targetScale + 0.02, 2.5);
+                else if (thumbDir === 'down') this.targetScale = Math.max(this.targetScale - 0.02, 0.3);
+                
+                this.currentScale += (this.targetScale - this.currentScale) * 0.1;
+                this.mesh.scale.setScalar(this.currentScale);
+
+                // Fist: rigid movement
+                if (isFist) {
+                    this.mesh.position.set(this.baseX + handX, this.baseY + handY, this.baseZ + handZ);
+                    return;
+                }
+
+                // Normal orbital
+                const dx = this.mesh.position.x - handX;
+                const dy = this.mesh.position.y - handY;
+                const dz = this.mesh.position.z - handZ;
+                const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                const influenceRadius = 5 + fingerSpread * 3;
+                
+                if (dist < influenceRadius && dist > 0) {
+                    const influence = 1 - (dist / influenceRadius);
+                    const speedMult = 1 + handVelocity * 0.05;
+                    this.vx += (-dy / (dist+0.1)) * influence * 0.08 * speedMult;
+                    this.vy += (dx / (dist+0.1)) * influence * 0.08 * speedMult;
+                    this.vz += (-dy / (dist+0.1)) * influence * 0.08 * speedMult;
+                }
+                
+                this.vx += (this.baseX - this.mesh.position.x) * 0.02;
+                this.vy += (this.baseY - this.mesh.position.y) * 0.02;
+                this.vz += (this.baseZ - this.mesh.position.z) * 0.02;
+                this.vx *= 0.9;
+                this.vy *= 0.9;
+                this.vz *= 0.9;
+                
+                this.mesh.position.x += this.vx;
+                this.mesh.position.y += this.vy;
+                this.mesh.position.z += this.vz;
+                
+                // Color
+                const now = Date.now();
+                const inRainbow = rainbowMode && (now - rainbowStartTime) < 5000;
+                
+                if (inRainbow) {
+                    if (now - rainbowStartTime >= 5000) rainbowMode = false;
+                    const hue = ((this.baseX + this.baseY + (now - rainbowStartTime) * 0.001) % 360) / 360;
+                    this.mesh.material.color.setHSL(hue, 1, 0.5);
+                } else {
+                    const depthRatio = Math.max(0, Math.min(1, (this.mesh.position.z + 5) / 10));
+                    this.mesh.material.color.setRGB(1, 0.2 + 0.8*depthRatio, 0 + 1*depthRatio);
+                }
+            }
+        }
+
+        const spheres = [];
+        for (let x = 0; x < 7; x++) {
+            for (let y = 0; y < 7; y++) {
+                for (let z = 0; z < 3; z++) {
+                    spheres.push(new Sphere((x-3.5)*2, (y-3.5)*2, z*2-2));
+                }
+            }
+        }
+
+        let handX = 0, handY = 0, handZ = 0, prevHandX = 0, prevHandY = 0;
+        let handVelocity = 0, fingerSpread = 1;
+        let isFistClosed = false, thumbDirection = 'none';
+
+        const videoElement = document.getElementById('video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+
+        function detectFist(landmarks) {
+            const palm = landmarks[0];
+            const tips = [4, 8, 12, 16, 20];
+            let closeCount = 0;
+            tips.forEach(tip => {
+                const dist = Math.sqrt((landmarks[tip].x - palm.x)**2 + (landmarks[tip].y - palm.y)**2);
+                if (dist < 0.15) closeCount++;
+            });
+            return closeCount >= 4;
+        }
+
+        function detectThumbDirection(landmarks) {
+            const thumbTip = landmarks[4], thumbBase = landmarks[2];
+            const thumbExtended = Math.abs(thumbTip.y - thumbBase.y) > 0.1;
+            if (!thumbExtended) return 'none';
+            
+            const fingersClosed = landmarks[8].y > landmarks[6].y && landmarks[12].y > landmarks[10].y;
+            if (!fingersClosed) return 'none';
+            
+            if (thumbTip.y < thumbBase.y - 0.05) return 'up';
+            if (thumbTip.y > thumbBase.y + 0.05) return 'down';
+            return 'none';
+        }
+
+        function onResults(results) {
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            
+            if (results.multiHandLandmarks) {
+                for (const landmarks of results.multiHandLandmarks) {
+                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#ff3300', lineWidth: 2});
+                    drawLandmarks(canvasCtx, landmarks, {color: '#ffffff', lineWidth: 1, radius: 3});
+                    
+                    const wasFist = isFistClosed;
+                    isFistClosed = detectFist(landmarks);
+                    thumbDirection = detectThumbDirection(landmarks);
+                    
+                    if (isFistClosed && !wasFist) {
+                        spheres.forEach(s => s.snapToBase());
+                    }
+                    
+                    prevHandX = handX;
+                    prevHandY = handY;
+                    handX = (landmarks[9].x - 0.5) * 20;
+                    handY = -(landmarks[9].y - 0.5) * 20;
+                    handZ = -landmarks[9].z * 10;
+                    
+                    handVelocity = Math.sqrt((handX - prevHandX)**2 + (handY - prevHandY)**2);
+                    
+                    const spreadDist = Math.sqrt((landmarks[4].x - landmarks[20].x)**2 + (landmarks[4].y - landmarks[20].y)**2);
+                    fingerSpread = spreadDist * 5;
+                }
+            }
+            canvasCtx.restore();
+        }
+
+        const hands = new Hands({ locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        hands.onResults(onResults);
+
+        document.getElementById('enableCameraBtn').addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+                videoElement.srcObject = stream;
+                videoElement.onloadedmetadata = () => {
+                    canvasElement.width = videoElement.videoWidth;
+                    canvasElement.height = videoElement.videoHeight;
+                    new Camera(videoElement, {
+                        onFrame: async () => await hands.send({ image: videoElement }),
+                        width: 640,
+                        height: 480
+                    }).start();
+                    document.getElementById('permissionOverlay').classList.add('hidden');
+                };
+            } catch (e) {
+                alert('Camera required for hand tracking.');
+            }
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            handVelocity *= 0.9;
+            spheres.forEach(s => s.update(handX, handY, handZ, handVelocity, fingerSpread, isFistClosed, thumbDirection));
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
