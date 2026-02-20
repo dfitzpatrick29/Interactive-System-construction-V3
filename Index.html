@@ -380,7 +380,10 @@
                 
                 if (inRainbow) {
                     if (now - rainbowStartTime >= 5000) rainbowMode = false;
-                    const hue = ((this.baseX + this.baseY + (now - rainbowStartTime) * 0.001) % 360) / 360;
+                    // Time-based cycling hue for each sphere with unique offset
+                    const timeOffset = (now - rainbowStartTime) * 0.0005; // Speed of color change
+                    const positionOffset = (this.baseX * 10 + this.baseY * 10 + this.baseZ * 10); // Unique per sphere
+                    const hue = (timeOffset + positionOffset * 0.1) % 1.0;
                     this.mesh.material.color.setHSL(hue, 1, 0.5);
                 } else {
                     const depthRatio = Math.max(0, Math.min(1, (this.mesh.position.z + 5) / 10));
@@ -450,7 +453,7 @@
                     
                     prevHandX = handX;
                     prevHandY = handY;
-                    handX = (landmarks[9].x - 0.5) * 20;
+                    handX = -((landmarks[9].x - 0.5) * 20); // Mirrored X-axis
                     handY = -(landmarks[9].y - 0.5) * 20;
                     handZ = -landmarks[9].z * 10;
                     
